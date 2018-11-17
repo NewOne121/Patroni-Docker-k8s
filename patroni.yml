@@ -1,0 +1,95 @@
+namespace: /patroni # Nmae of topic in ZK
+scope: SCOPEAME #This value should be unique forevery pg_data folder
+name: NODENAME #Name of current node
+
+restapi:
+  listen: 0.0.0.0:8008
+  connect_address: MASTER_NODE_IP:8008
+  authentication:
+    username: apiuser
+    password: QzwMNiNVJT6goyS
+
+zookeeper:
+  hosts: ['ZK1:2181', 'ZK2:2181', 'ZK3:2181'] #should be a odd number
+
+bootstrap:
+  dcs:
+    ttl: 30 #ttl=loop_wait + (retry_timeout*2)
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1073741824
+    synchronous_mode: false
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        logging_collector: on
+        log_statement: 'ddl'
+        log_timezone: 'UTC'
+        log_destination: 'stderr,csvlog'
+        log_directory: '/var/lib/postgresql/data/pg_data/log'
+        log_filename: 'postgresql-%Y-%m-%d_%H%M%S.log'
+        log_file_mode: 0600
+        log_rotation_age: 2d
+        max_connections: 1500
+        shared_buffers: 1024MB
+        work_mem: 32MB
+        min_wal_size: 1GB
+        max_wal_size: 8GB
+        wal_level: hot_standby
+        hot_standby: "on"
+        hot_standby_feedback: on
+        wal_keep_segments: 30
+        max_wal_senders: 8
+        max_replication_slots: 8
+        wal_log_hints: "on"
+        max_standby_archive_delay: 300s
+        max_standby_streaming_delay: 300s
+        wal_receiver_status_interval: 10s
+        dynamic_shared_memory_type: posix
+        autovacuum_vacuum_scale_factor: 0.01
+        checkpoint_completion_target: 0.9
+        checkpoint_timeout: 900
+        default_text_search_config: 'pg_catalog.english'
+        datestyle: 'iso, mdy'
+        lc_messages: 'en_US.utf8'
+        lc_monetary: 'en_US.utf8'
+        lc_numeric: 'en_US.utf8'
+        lc_time: 'en_US.utf8'
+
+  initdb:
+  - encoding: UTF8
+  - data-checksums
+  - waldir=/var/lib/postgresql/data/pg_wal
+
+  pg_hba:
+  - host replication replicationuser DBNODENAME/32 md5
+  - host replication replicationuser DBNODENAME/32 md5
+  - host replication replicationuser 172.0.0.0/0 trust
+  - host replication replicationuser 127.0.0.1/32 md5
+
+postgresql:
+  listen: 0.0.0.0:5435
+  connect_address: HOSTIP:5435
+  data_dir: /data/pg_data
+  remove_data_directory_on_rewind_failure: true
+  pgpass: /tmp/pgpass
+  authentication:
+    replication:
+      username: replicationuser
+      password: replicationpass
+    superuser:
+      username: postgres
+      password: postgrespasswd
+  parameters:
+    unix_socket_directories: '.'
+
+watchdog:
+  mode: off
+
+tags:
+    nofailover: false
+    noloadbalance: false
+    clonefrom: false
+    nosync: false
+
