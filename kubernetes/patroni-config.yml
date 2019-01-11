@@ -1,25 +1,25 @@
-npiVersion: v1
+apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: filebeat-config
+  name: patroni-config
   namespace: default
   labels:
-    k8s-app: filebeat
+    k8s-app: patroni
 data:
-  filebeat.yml: |-
-    namespace: /patroni-${CLUSTERNAME} # Nmae of topic in ZK
-    scope: ${SCOPEAME} #This value should be unique forevery pg_data folder
-    name: ${HOSTNAME} #Name of current node
+  patroni.yml: |+
+    namespace: /patroni-cluster1 # Nmae of topic in ZK
+    scope: test-cluster1 #This value should be unique forevery pg_data folder
+    name: ${PATRONI_NAME} #Name of current node
 
     restapi:
       listen: 0.0.0.0:8008
-      connect_address: ${HOSTNAME}:8008
+      connect_address: 0.0.0.0:8008
       authentication:
         username: apiuser
         password: QzwMNiNVJT6goyS
 
     zookeeper:
-      hosts: ['zookeeper-0.${CLUSTERNAME}.default.svc.cluster.local:2181', 'zookeeper-0.${CLUSTERNAME}.default.svc.cluster.local:2181', 'zookeeper-0.${CLUSTERNAME}.default.svc.cluster.local:2181'] #should be a odd number
+      hosts: ['zookeeper-0.${ZOOKEEPER_CLUSTER}.default.svc.cluster.local:2181', 'zookeeper-0.${ZOOKEEPER_CLUSTER}.default.svc.cluster.local:2181', 'zookeeper-0.${ZOOKEEPER_CLUSTER}.default.svc.cluster.local:2181'] #should be a odd number
 
     bootstrap:
       dcs:
@@ -36,7 +36,7 @@ data:
             log_statement: 'ddl'
             log_timezone: 'UTC'
             log_destination: 'stderr,csvlog'
-            log_directory: '/var/lib/postgresql/data/pg_data/log'
+            log_directory: '/data/pg_data/log'
             log_filename: 'postgresql-%Y-%m-%d_%H%M%S.log'
             log_file_mode: 0600
             log_rotation_age: 2d
@@ -66,37 +66,39 @@ data:
             lc_numeric: 'en_US.utf8'
             lc_time: 'en_US.utf8'
 
-  initdb:
-  - encoding: UTF8
-  - data-checksums
-  - waldir=/var/lib/postgresql/data/pg_wal
+    initdb:
+    - encoding: UTF8
+    - data-checksums
+    - waldir=/data/pg_data/pg_wal
 
-  pg_hba:
-  - host replication replicationuser 10.244.0.0/0 trust
-  - host replication replicationuser 127.0.0.1/32 md5
+    pg_hba:
+    - host replication replicationuser 10.244.0.0/0 trust
+    - host replication replicationuser 127.0.0.1/32 md5
 
-postgresql:
-  listen: 0.0.0.0:5435
-  connect_address: ${HOSTNAME}:5435
-  data_dir: /data/pg_data
-  remove_data_directory_on_rewind_failure: true
-  pgpass: /tmp/pgpass
-  authentication:
-    replication:
-      username: replicationuser
-      password: replicationpass
-    superuser:
-      username: postgres
+    users:
+    - admin: postgres
       password: postgrespasswd
-  parameters:
-    unix_socket_directories: '.'
 
-watchdog:
-  mode: off
+    postgresql:
+      listen: 0.0.0.0:5435
+      data_dir: /data/pg_data
+      remove_data_directory_on_rewind_failure: true
+      pgpass: /tmp/pgpass
+      authentication:
+        replication:
+          username: replicationuser
+          password: replicationpass
+        superuser:
+          username: postgres
+          password: postgrespasswd
+      parameters:
+        unix_socket_directories: '.'
 
-tags:
-    nofailover: false
-    noloadbalance: false
-    clonefrom: false
-    nosync: false
+    watchdog:
+      mode: off
 
+    tags:
+        nofailover: false
+        noloadbalance: false
+        clonefrom: false
+        nosync: false

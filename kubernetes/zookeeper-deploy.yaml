@@ -11,6 +11,7 @@ spec:
     matchLabels:
       app: zookeeper
   serviceName: "zookeeper-cluster0"
+  podManagementPolicy: Parallel
   template:
     metadata:
       labels:
@@ -25,13 +26,35 @@ spec:
           mountPath: /data
       containers:
       - name: zookeeper
-        image: docker.io/zookeeper
-        env:
-        - name: dataDir
-          value: /data
+        image: "k8s.gcr.io/kubernetes-zookeeper:1.0-3.4.10"
         ports:
-        - name: client-port
-          containerPort: 2181
+        - containerPort: 2181
+          name: client
+        - containerPort: 2888
+          name: server
+        - containerPort: 3888
+          name: leader-election
+        command:
+        - sh
+        - -c
+        - "start-zookeeper \
+          --servers=3 \
+          --data_dir=/var/lib/zookeeper/data \
+          --data_log_dir=/var/lib/zookeeper/data/log \
+          --conf_dir=/opt/zookeeper/conf \
+          --client_port=2181 \
+          --election_port=3888 \
+          --server_port=2888 \
+          --tick_time=2000 \
+          --init_limit=10 \
+          --sync_limit=5 \
+          --heap=512M \
+          --max_client_cnxns=60 \
+          --snap_retain_count=3 \
+          --purge_interval=12 \
+          --max_session_timeout=40000 \
+          --min_session_timeout=4000 \
+          --log_level=INFO"
         volumeMounts:
         - name: zookeeper-volume
           mountPath: /data
@@ -49,7 +72,24 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: zookeeper-cluster0
+  name: zookeeper-cluster0-server
+  labels:
+    app: zookeeper
+    type: headless
+spec:
+  ports:
+  - port: 2888
+    name: server
+  - port: 3888
+    name: leader-election
+  clusterIP: None
+  selector:
+    app: zookeeper
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-cluster0-client
   labels:
     app: zookeeper
     type: headless

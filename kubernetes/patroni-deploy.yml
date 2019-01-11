@@ -5,6 +5,7 @@ metadata:
   name: patroni
   namespace: default
 spec:
+  replicas: 1
   template:
     metadata:
       labels:
@@ -13,43 +14,80 @@ spec:
       containers:
       - image: localhost:5000/patroni-kazoo
         name: patroni
+#        command: ["/bin/sh"]
+#        args: ["-c", "while true; do echo hello; sleep 10;done"]
+        command: ["patroni"]
+        args: ["/etc/patroni.yml"]
+        env:
+        - name: PATRONI_NAMESPACE
+          value: /patroni-test
+        - name: PATRONI_SCOPE
+          value: cluster0
+        - name: PATRONI_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: PATRONI_LOGLEVEL
+          value: DEBUG
+        - name: PATRONI_ZOOKEEPER_HOSTS
+          value: "'zookeeper-0.zookeeper-cluster0.default.svc.cluster.local','zookeeper-0.zookeeper-cluster0.default.svc.cluster.local','zookeeper-0.zookeeper-cluster0.default.svc.cluster.local'"
+        - name: PATRONI_KUBERNETES_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: PATRONI_POSTGRESQL_CONNECT_ADDRESS
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: PATRONI_RESTAPI_CONNECT_ADDRESS
+          value: "${PATRONI_KUBERNETES_POD_IP}:8008"
+        - name: PATRONI_RESTAPI_LISTEN
+          value: "0.0.0.0:8008"
+        - name: PATRONI_POSTGRESQL_LISTEN
+          value: "0.0.0.0:5435"
+        - name: PATRONI_POSTGRESQL_DATA_DIR
+          value: /data/pg_data
+        - name: PATRONI_SUPERUSER_USERNAME
+          value: postgres
+        - name: PATRONI_SUPERUSER_PASSWORD
+          value: postgres
         ports:
-        - name: patroni
-          containerPort: 5044
+        - name: psql
+          containerPort: 5435
+          protocol: TCP
+        - name: restapi
+          containerPort: 8008
           protocol: TCP
         volumeMounts:
         - name: config
-          mountPath: /usr/share/patroni/config/patroni.yml
+          mountPath: /etc/patroni.yml
           subPath: patroni.yml
-          readOnly: true
-        - name: pipeline
-          mountPath: /usr/share/patroni/pipeline
-          readOnly: true
         - name: localtime
           mountPath: /etc/localtime
-        resources:
-          limits:
-            memory: 4Gi
-            cpu: "500m"
-          requests:
-            memory: 2Gi
-            cpu: "200m"
       volumes:
       - name: localtime
         hostPath:
           path: /usr/share/zoneinfo/Europe/Moscow
-      - name: pipeline
-        configMap:
-          name: patroni
-          items:
-          - key: patroni.conf
-            path: patroni.conf
       - name: config
         configMap:
-          name: patroni
-          items:
-          - key: patroni.yml
-            path: patroni.yml
+          name: patroni-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patroni-cluster0
+  labels:
+    app: patroni
+    type: headless
+spec:
+  clusterIP: None
+  ports:
+  - port: 5435
+    name: psql
+  - port: 8008
+    name: restapi
+  selector:
+    app: patroni
 ---
 apiVersion: v1
 kind: Service
@@ -64,7 +102,7 @@ spec:
     app: patroni
   ports:
   - name: patroni
-    nodePort: 31113
-    port: 5044
-    targetPort: 5044
+    nodePort: 31116
+    port: 5435
+    targetPort: 5435
     protocol: TCP
