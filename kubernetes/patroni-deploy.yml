@@ -1,0 +1,70 @@
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: patroni
+  namespace: default
+spec:
+  template:
+    metadata:
+      labels:
+        app: patroni
+    spec:
+      containers:
+      - image: localhost:5000/patroni-kazoo
+        name: patroni
+        ports:
+        - name: patroni
+          containerPort: 5044
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /usr/share/patroni/config/patroni.yml
+          subPath: patroni.yml
+          readOnly: true
+        - name: pipeline
+          mountPath: /usr/share/patroni/pipeline
+          readOnly: true
+        - name: localtime
+          mountPath: /etc/localtime
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "500m"
+          requests:
+            memory: 2Gi
+            cpu: "200m"
+      volumes:
+      - name: localtime
+        hostPath:
+          path: /usr/share/zoneinfo/Europe/Moscow
+      - name: pipeline
+        configMap:
+          name: patroni
+          items:
+          - key: patroni.conf
+            path: patroni.conf
+      - name: config
+        configMap:
+          name: patroni
+          items:
+          - key: patroni.yml
+            path: patroni.yml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patroni
+  namespace: default
+  labels:
+    app: patroni
+spec:
+  type: NodePort
+  selector:
+    app: patroni
+  ports:
+  - name: patroni
+    nodePort: 31113
+    port: 5044
+    targetPort: 5044
+    protocol: TCP

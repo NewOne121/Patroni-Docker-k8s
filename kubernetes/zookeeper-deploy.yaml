@@ -1,0 +1,79 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  labels:
+    app: zookeeper
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: zookeeper
+  serviceName: "zookeeper-cluster0"
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      initContainers:
+      - name: fix-permissions
+        image: busybox
+        command: ["sh", "-c", "chown -R 1000:1000 /data"]
+        volumeMounts:
+        - name: zookeeper-volume
+          mountPath: /data
+      containers:
+      - name: zookeeper
+        image: docker.io/zookeeper
+        env:
+        - name: dataDir
+          value: /data
+        ports:
+        - name: client-port
+          containerPort: 2181
+        volumeMounts:
+        - name: zookeeper-volume
+          mountPath: /data
+        - name: localtime
+          mountPath: /etc/localtime
+      volumes:
+        - name: zookeeper-volume
+          hostPath:
+            path: /data/zookeeper
+            type: Directory
+        - name: localtime
+          hostPath:
+            path: /usr/share/zoneinfo/Europe/Moscow
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-cluster0
+  labels:
+    app: zookeeper
+    type: headless
+spec:
+  clusterIP: None
+  ports:
+  - port: 2181
+    name: client
+  selector:
+    app: zookeeper
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-external
+  labels:
+    app: zookeeper
+    type: tcp
+spec:
+  type: NodePort
+  ports:
+  - nodePort: 31115
+    port: 12181
+    protocol: TCP
+    targetPort: 2181
+  selector:
+    app: zookeeper
