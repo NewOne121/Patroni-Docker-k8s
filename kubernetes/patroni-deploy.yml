@@ -5,7 +5,7 @@ metadata:
   name: patroni
   namespace: default
 spec:
-  replicas: 1
+  replicas: 3
   template:
     metadata:
       labels:
@@ -44,7 +44,7 @@ spec:
         - name: PATRONI_RESTAPI_LISTEN
           value: "0.0.0.0:8008"
         - name: PATRONI_POSTGRESQL_LISTEN
-          value: "0.0.0.0:5435"
+          value: "0.0.0.0:5432"
         - name: PATRONI_POSTGRESQL_DATA_DIR
           value: /data/pg_data
         - name: PATRONI_SUPERUSER_USERNAME
@@ -53,7 +53,7 @@ spec:
           value: postgres
         ports:
         - name: psql
-          containerPort: 5435
+          containerPort: 5432
           protocol: TCP
         - name: restapi
           containerPort: 8008
@@ -64,6 +64,8 @@ spec:
           subPath: patroni.yml
         - name: localtime
           mountPath: /etc/localtime
+        - name: patronihba
+          mountPath: /var/extra
       volumes:
       - name: localtime
         hostPath:
@@ -71,6 +73,9 @@ spec:
       - name: config
         configMap:
           name: patroni-config
+      - name: patronihba
+        configMap:
+          name: patronihba
 ---
 apiVersion: v1
 kind: Service
@@ -82,7 +87,7 @@ metadata:
 spec:
   clusterIP: None
   ports:
-  - port: 5435
+  - port: 5432
     name: psql
   - port: 8008
     name: restapi
@@ -103,6 +108,6 @@ spec:
   ports:
   - name: patroni
     nodePort: 31116
-    port: 5435
-    targetPort: 5435
+    port: 5432
+    targetPort: 5432
     protocol: TCP

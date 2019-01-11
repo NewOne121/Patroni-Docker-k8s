@@ -1,6 +1,30 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: patronihba
+  namespace: default
+  labels:
+    k8s-app: patroni
+data:
+  pg_hba.conf: |+
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+    # "local" is for Unix domain socket connections only
+    local   all             all                                     trust
+    # IPv4 local connections:
+    host    all             all             127.0.0.1/32            trust
+    # IPv6 local connections:
+    host    all             all             ::1/128                 trust
+    # Allow replication connections from localhost, by a user with the
+    # replication privilege.
+    local   replication     all                                     trust
+    host    replication     all             127.0.0.1/32            trust
+    host    replication     all             ::1/128                 trust
+    host    replication     replicationuser 10.244.0.0/16   trust
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: patroni-config
   namespace: default
   labels:
@@ -65,6 +89,7 @@ data:
             lc_monetary: 'en_US.utf8'
             lc_numeric: 'en_US.utf8'
             lc_time: 'en_US.utf8'
+            hba_file: '/var/extra/pg_hba.conf'
 
     initdb:
     - encoding: UTF8
@@ -72,15 +97,16 @@ data:
     - waldir=/data/pg_data/pg_wal
 
     pg_hba:
-    - host replication replicationuser 10.244.0.0/0 trust
-    - host replication replicationuser 127.0.0.1/32 md5
+      host replication replicationuser 10.244.0.0/16 trust
+      host replication replicationuser 127.0.0.1/32 md5
 
     users:
     - admin: postgres
       password: postgrespasswd
 
     postgresql:
-      listen: 0.0.0.0:5435
+      listen: 0.0.0.0:5432
+      connect: ${PATRONI_POSTGRESQL_CONNECT_ADDRESS}:5432
       data_dir: /data/pg_data
       remove_data_directory_on_rewind_failure: true
       pgpass: /tmp/pgpass
